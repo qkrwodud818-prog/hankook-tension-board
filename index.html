@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>한반도 긴장도 지수 — 지금 무슨 상황인지 1분 요약</title>
+<meta name="description" content="언론사 RSS를 실시간 집계해 만든 데이터 기반 한반도 긴장도 지수와 안보 이벤트 타임라인. 전쟁 공포 콘텐츠가 아니라 공식 뉴스 헤드라인 분석입니다.">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="nav"><a href="/">대시보드</a><a href="/weekly">주간 회고</a><a href="/guides">생활 가이드</a><a href="/about">소개</a><a href="/contact">문의</a></div>
+<header>
+  <h1>한반도 긴장도 지수
+    <span>군사 용어 없이, 지금 무슨 상황인지 1분 만에</span>
+  </h1>
+  <div class="upd" id="upd">불러오는 중…</div>
+</header>
+
+<div class="card">
+  <div class="gauge-top">
+    <div class="level" id="state">—</div>
+    <div class="nums"><b id="score">—</b>/100 긴장도<br><span id="raw"></span></div>
+  </div>
+  <div class="bar"><i id="bar" style="width:0%"></i></div>
+  <div class="guide" id="guide">집결 중…</div>
+</div>
+
+<h2>안보 이벤트 타임라인 <small>최근 헤드라인 자동 분류</small></h2>
+<div class="card"><ul class="tl" id="tl"><li class="meta">로딩 중…</li></ul></div>
+
+<div class="ads">[ 광고 영역 — 트래픽 확보 후 애드센스/네이버 GFA 연동 ]</div>
+
+<h2>원본 헤드라인 <small id="cnt"></small></h2>
+<div class="card">
+  <ul class="feed" id="fd"></ul>
+  <div class="src" id="srcs"></div>
+</div>
+
+<div class="card">
+  <h2>이 지수는 어떻게 계산하나</h2>
+  <p class="dis">연합뉴스·KBS·MBC·SBS·한겨레·BBC 코리아의 RSS 헤드라인과 요약을 48시간 단위로 수집하고, 안보 관련 키워드에 가중치를 주어 합산합니다. 미사일 발사(+12), 접경지 접근(+10), 포격(+11) 같은 격상 신호는 더하고, 대화 재개(−7)·긴장 완화(−8) 같은 완화 신호는 뺍니다. 합계를 0~100 곡선으로 압축한 값입니다.<br><br><b>이건 위협 평가가 아니라 정보 밀도 지표입니다.</b> 전쟁 예측 도구가 아닙니다. 판단은 언제나 نفسك와 공식 기관의 안내를 따르세요.</p>
+</div>
+
+<footer>
+  데이터는 각 언론사 RSS에서 자동 수집되며, 모든 저작권은 원 출처에 있습니다.<br>
+  이 사이트는 전쟁·재난을 조작하거나 공포를 조장하지 않습니다. 헤드라인이 반복될수록 원문을 직접 확인하세요.
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const COL = {'관측':'#3ddc97','주의':'#ffc857','경계':'#ff8b5e','위기':'#ff5470','오류':'#8b96ad'};
+const esc = s => (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function ago(ts){
+  const d = Date.now()/1000 - ts;
+  if(d<3600) return Math.max(1,Math.round(d/60))+'분 전';
+  if(d<86400) return Math.round(d/3600)+'시간 전';
+  return Math.round(d/86400)+'일 전';
+}
+async function load(){
+  try{
+    const r = await fetch('/api/status',{cache:'no-store'});
+    const j = await r.json();
+    $('state').textContent = j.state;
+    $('state').style.color = COL[j.state]||'#8b96ad';
+    $('score').textContent = j.level;
+    $('bar').style.width = j.level+'%';
+    $('bar').style.background = COL[j.state]||'#8b96ad';
+    $('guide').textContent = j.guidance;
+    $('raw').textContent = j.feeds_ok+'/'+j.feeds_total+'개 매체 연결';
+    $('upd').textContent = '마지막 갱신 ' + new Date(j.updated).toLocaleString('ko-KR')
+      + (j.errors?.length ? '  · 일부 매체 실패: '+j.errors.join(', ') : '');
+
+    $('tl').innerHTML = j.timeline.length ? j.timeline.map(t=>`
+      <li><div class="e">${t.emoji}</div>
+        <div class="lb">${esc(t.label)}</div>
+        <div class="tx"><a href="${esc(t.link)}" target="_blank" rel="noopener">
+          <b>${esc(t.title)}</b></a>
+          <div class="meta">${esc(t.source)} · ${t.ts?ago(t.ts):'시각 미상'}</div></div></li>`).join('')
+      : '<li class="meta">최근 5일간 분류된 안보 이벤트가 없습니다.</li>';
+
+    $('cnt').textContent = `총 ${j.feed.length}건`;
+    $('fd').innerHTML = j.feed.slice(0,40).map(i=>`
+      <li><a href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.title)}</a>
+      <div class="s">${esc(i.source)} · ${i.ts?ago(i.ts):'시각 미상'}</div></li>`).join('')
+      || '<li class="err">헤드라인을 가져오지 못했습니다.</li>';
+
+    const seen=new Set();
+    $('srcs').innerHTML = [...new Set(j.feed.map(i=>i.source))].map(s=>
+      `<a href="#" onclick="return false">${esc(s)}</a>`).join('');
+  }catch(e){
+    $('state').textContent='오류';
+    $('guide').className='guide err';
+    $('guide').textContent='서버에 연결하지 못했습니다. python server.py가 실행 중인지 확인하세요. ('+e.message+')';
+  }
+}
+load();
+setInterval(load, 120000);
+</script>
+</body>
+</html>
