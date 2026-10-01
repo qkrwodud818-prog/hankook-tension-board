@@ -95,3 +95,33 @@ h2 small{font-size:12px;color:#8b96ad;font-weight:400;margin-left:6px}
 .fd li>div{flex:1;min-width:0}
 .ad-off{color:#8b96ad;font-size:11px}
 @media(max-width:420px){.thumb{width:68px;height:46px;flex:0 0 68px}}
+
+/* ---- 이슈 랭킹 ---- */
+.rank{list-style:none;counter-reset:none}
+.rank li{display:flex;gap:11px;align-items:flex-start;padding:13px 0;border-bottom:1px solid #242b3a}
+.rank li:last-child{border-bottom:0}
+.rank .no{flex:0 0 26px;height:26px;border-radius:8px;background:#1e2637;color:#8b96ad;
+  font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.rank li:nth-child(1) .no{background:#5b9dff;color:#08111f}
+.rank li:nth-child(2) .no{background:#31456b;color:#cfe0ff}
+.rank li:nth-child(3) .no{background:#28324a;color:#cfe0ff}
+.rank li>div{flex:1;min-width:0}
+.rank a{font-size:15px;font-weight:600;line-height:1.45;display:block}
+.rank a:hover{color:#5b9dff}
+.rank .m{color:#8b96ad;font-size:12px;margin-top:5px}
+.rank .cnt{color:#5b9dff}
+.rank .hot{color:#ff8b5e}
+.rank .out{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px}
+.rank .out span{font-size:11px;color:#8b96ad;background:#0d111a;border:1px solid #242b3a;
+  border-radius:20px;padding:2px 8px}
+.rank .tm{flex:0 0 auto;font-size:11px;color:#8b96ad;margin-top:3px}
+.rank .empty{color:#8b96ad;font-size:14px;padding:8px 0}
+.live{color:#3ddc97;font-weight:400;margin-left:8px}
+
+/* ---- 제휴 링크 ---- */
+.pl{list-style:none;margin:12px 0}
+.pl li{display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+  border-bottom:1px solid #242b3a;padding:10px 0}
+.pl li:last-child{border-bottom:0}
+.pl a{font-size:15px;color:#5b9dff}
+.pl span{font-size:12px;color:#8b96ad;text-align:right}

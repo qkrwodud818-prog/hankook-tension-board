@@ -33,7 +33,7 @@ def bing(query):
     return f"https://www.bing.com/news/search?q={q}&format=RSS&setmkt=ko-KR"
 
 
-# (라벨, URL, 종류) 종류: gnews=구글뉴스 / bing=썸네일 有 / plain=일반RSS
+# (라벨, URL, 종류) 종류: gnews=구글뉴스 / bing=썸네일 有 / plain=일반 RSS
 FEEDS = [
     ("구글뉴스 · 북한안보", gnews("북한 안보"), "gnews"),
     ("구글뉴스 · 미사일", gnews("북한 미사일"), "gnews"),
@@ -50,7 +50,7 @@ FEEDS = [
 
 
 def _tag(item, name):
-    """네임스페이스 무관하게 子요소 텍스트를 꺼낸다 (Bing RSS 는 네임스페이스가 붙는다)."""
+    """네임스페이스 무관하게 자식 요소를 꺼낸다 (Bing RSS 는 네임스페이스가 붙는다)."""
     for c in item:
         if c.tag.split("}")[-1] == name:
             return (c.text or "").strip()
@@ -94,7 +94,7 @@ EASING = [
 
 #、역량 논의에 자주 붙는 맥락어 — 이게 있으면 사건 신호가 아니라 분석 기사로 본다
 ANALYSIS_CTX = re.compile(
-    r"능력|_PAD|패권|경쟁|-race|우위|열세|격차|부족|추격|劣势한계|검토|필요|방어|대응\s*준비|역량"
+    r"능력|패권|경쟁|우위|열세|격차|부족|한계|검토|필요|방어|대응\\s*준비|역량"
 )
 
 # 이벤트 라벨: (패턴, 라벨, 이모지)
@@ -143,6 +143,121 @@ def parse_date(s):
         except ValueError:
             continue
     return None
+
+
+# ── 이슈 랭킹 ────────────────────────────────────────────────
+# 같은 사건을 여러 매체가 다르게 부르는 경우가 많아, 제목을 그대로 비교할 수는 없다.
+# 한국어 토큰을 뽑아 공통 핵심어 비율이 높은 기사끼리 묶고,
+# "몇 개 매체가 함께 다뤘는가" 를 이슈 중요도의 1순위 지표로 쓴다.
+
+_STOP = set("""
+대한민국 북한 한국 조선 하나 둘 에서 에게 로서 곳 부터 까지 조차 보다 대한 따라
+이번 지난 오늘 내일 현재 신보 보도 발표 뉴스 기사 제목 사진 영상 내용 문제
+준비 사람 경우 우리 나라 관련 이번에 통해 대한 등 및 또는 이 저 그 가장
+""".split())
+
+
+def _tokens(title):
+    words = re.findall(r"[가-힣]{2,}", title)
+    out = []
+    for w in words:
+        if w in _STOP:
+            continue
+        if re.fullmatch(r"(본|해당|이번|지난|관련|대한|우리|나라|경우|내용|문제|준비|사람|한국|대표|그룹)", w):
+            continue
+        out.append(w)
+    return out
+
+
+def _sig(title):
+    """기사별 핵심어 집합 (빈도 높은 일반어를 빼고 상위 6개만 남긴다)"""
+    toks = _tokens(title)
+    if not toks:
+        toks = re.findall(r"[가-힣]{2,}", title)[:4]
+    freq = {}
+    for t in toks:
+        freq[t] = freq.get(t, 0) + 1
+    # 긴 단어가 더 구체적이므로 길이 가중 정렬
+    ranked = sorted(freq.items(), key=lambda kv: (-kv[1], -len(kv[0])))
+    return {t for t, _ in ranked[:6]}
+
+
+def build_issues(items, now, top=8):
+    """유사 기사 묶기 → 이슈 랭킹"""
+    clusters = []  # {sig:set, rep:item, members:[item]}
+    for it in items:
+        if not it["ts"] or now - it["ts"] > 72 * 3600:
+            continue
+        sig = _sig(it["title"])
+        if not sig:
+            continue
+        best, best_ov = None, 0.0
+        for c in clusters:
+            inter = len(sig & c["sig"])
+            if not inter:
+                continue
+            ov = inter / min(len(sig), len(c["sig"]))
+            if ov > best_ov:
+                best, best_ov = c, ov
+        if best is not None and best_ov >= 0.5:
+            best["members"].append(it)
+            best["sig"] |= sig & best["sig"]
+        else:
+            clusters.append({"sig": set(sig), "rep": it, "members": [it]})
+
+    # 유사 군집 병합 (같은 사건이 두 묶음으로 갈리는 것을 방지)
+    merged = []
+    for c in clusters:
+        hit = None
+        for m in merged:
+            ov = len(c["sig"] & m["sig"]) / max(1, min(len(c["sig"]), len(m["sig"])))
+            if ov >= 0.4:
+                hit = m
+                break
+        if hit:
+            hit["sig"] |= c["sig"] & hit["sig"]
+            hit["members"].extend(c["members"])
+        else:
+            merged.append(c)
+    clusters = merged
+
+    out = []
+    for c in clusters:
+        m = c["members"]
+        if len(m) < 2:
+            continue
+        outlets = {x["source"] for x in m}
+        newest = max(m, key=lambda x: x["ts"])
+        oldest = min(x["ts"] for x in m)
+        # 격상 신호가 있으면 가산점
+        esc = 0
+        for pat, w in ESCALATION:
+            if re.search(pat, c["rep"]["title"]):
+                esc = w
+                break
+        if ANALYSIS_CTX.search(c["rep"]["title"]):
+            esc *= 0.4
+        # 이슈 점수 = 매체 다름 수(최우선) + 보도량 + 격상 신호 - 노화
+        age_h = max(0.0, (now - oldest) / 3600)
+        fresh = max(0.0, 1.0 - age_h / 72.0)
+        rank = len(outlets) * 10 + len(m) * 2.5 + esc * 1.2 + fresh * 8
+        out.append({
+            "rank_score": round(rank, 1),
+            "title": c["rep"]["title"],
+            "link": newest["link"],
+            "image": newest.get("image"),
+            "outlet_count": len(outlets),
+            "article_count": len(m),
+            "outlets": sorted(outlets)[:6],
+            "ts": newest["ts"],
+            "escalation": esc,
+        })
+
+    out.sort(key=lambda x: -x["rank_score"])
+    for i, o in enumerate(out, 1):
+        o["no"] = i
+        del o["rank_score"]
+    return out[:top]
 
 
 def collect():
@@ -209,7 +324,7 @@ def collect():
     recent = [i for i in items if i["ts"] and now - i["ts"] < 60 * 60 * 24 * 7]
 
     # 긴장도: 최근 48시간 헤드라인 가중합 → 0~100 정규화
-    # 같은 사건을多家가 보도하면 그만큼 반복되므로 "고유 사건 수" 기준으로 스케일을 나눈다.
+    # 같은 사건을多家가 보도하면 그만큼 반복되므로 "고유 사건 수" 기준으로 스케일로 나눕니다.
     score = 0
     for i in recent:
         if now - i["ts"] > 48 * 3600:
@@ -290,6 +405,7 @@ def collect():
     }[state]
 
     return {
+        "issues": build_issues(recent, now),
         "updated": datetime.now(KST).isoformat(),
         "level": level,
         "state": state,
@@ -314,7 +430,8 @@ def get_data(force=False):
                     return {
                         "error": str(e),
                         "level": 0,
-                        "state": "오류",
+                                                "state": "오류",
+                                                "issues": [],
                         "timeline": [],
                         "feed": [],
                         "updated": datetime.now(KST).isoformat(),

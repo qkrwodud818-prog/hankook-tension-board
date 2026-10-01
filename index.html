@@ -26,6 +26,11 @@
   <p class="what" id="what">불러오는 중…</p>
 </div>
 
+<h2>지금 가장 많이 다뤄지는 이슈 <small id="issUpd" class="live"></small></h2>
+<div class="card"><ol class="rank" id="iss"><li class="empty">집계 중…</li></ol></div>
+
+<div class="ads" data-ad-slot="2345678901"></div>
+
 <h2>무슨 일이 있었나</h2>
 <div class="card"><ul class="tl" id="tl"><li class="empty">확인 중…</li></ul></div>
 
@@ -39,6 +44,21 @@
 
 <h2>오늘 나온 안보 뉴스 <small id="cnt"></small></h2>
 <div class="card"><ul class="fd" id="fd"></ul></div>
+
+<h2>평소 준비해 두면 좋은 것</h2>
+<div class="card aff">
+  <p class="disc">긴장 국면이 아니라 <b>평상시</b>에 사 두면 됩니다. 긴장이 올라왔을 때 급하게 사지 않아도 됩니다.<br>
+  아래 링크는 <b>쿠팡 파트너스 제휴 링크</b>로, 구매하시면 이 사이트에 수수료가 지급될 수 있습니다. <b>가격 차이는 없으며 사지 않으셔도 됩니다.</b></p>
+  <ul class="pl">
+    <li><a href="#CP-WATER">생수 · 1인 3일치</a><span>가장 먼저 떨어집니다</span></li>
+    <li><a href="#CP-BATTERY">수동 충전 보조배터리</a><span>정전 시 콘센트도 사라집니다</span></li>
+    <li><a href="#CP-RADIO">휴대폰 FM 라디오</a><span>지자체 방송 주파수 수신</span></li>
+    <li><a href="#CP-FOOD">비상식 3일분</a><span>가스레인지 사용 가능 제품</span></li>
+  </ul>
+  <p class="dim"><a href="/guides">전체 준비물 체크리스트 보기</a></p>
+</div>
+
+<div class="ads" data-ad-slot="3456789012"></div>
 
 <div class="card small">
   <p><b>이 숫자는 무엇입니까.</b> 헤드라인에 안보 관련 표현이 얼마나 많이 나왔는지를 집계한 값입니다. 전쟁 임박을 예측하거나 위협을 평가하는 지표가 아닙니다. 실제 대응은 공식 기관 안내를 따르세요.</p>
@@ -84,6 +104,20 @@ async function load(){
     $('upd').textContent = '갱신 ' + new Date(j.updated).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
     $('act').textContent = ACT[j.state] || '';
 
+    // 이슈 랭킹
+    const iss = j.issues || [];
+    $('issUpd').textContent = iss.length ? (iss[0].outlet_count + '개 매체가 함께 보도 중') : '';
+    $('iss').innerHTML = iss.length ? iss.map(x=>
+      '<li>'+
+      '<span class="no">' + x.no + '</span>' +
+      (x.image ? '<img class="thumb" src="'+esc(x.image)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : '') +
+      '<div><a href="'+esc(x.link)+'" target="_blank" rel="noopener">'+esc(x.title)+'</a>'+
+      '<div class="m"><b class="cnt">'+x.outlet_count+'개 매체</b> · '+x.article_count+'건 보도'+
+      (x.escalation>=7 ? ' · <span class="hot">격상 신호</span>' : '')+'</div>'+
+      '<div class="out">'+x.outlets.map(o=>'<span>'+esc(o)+'</span>').join('')+'</div></div>'+
+      '<span class="tm">'+ago(x.ts)+'</span></li>').join('')
+      : '<li class="empty">여러 매체가 함께 다룬 이슈가 아직 없습니다.</li>';
+
     $('tl').innerHTML = (j.timeline||[]).length ? j.timeline.slice(0,8).map(t=>
       '<li>'+thumb(t)+'<span class="e">'+t.emoji+'</span><div><a href="'+esc(t.link)+'" target="_blank" rel="noopener">'+esc(t.title)+'</a>'+
       '<div class="m">'+esc(t.label)+' · '+(t.ts?ago(t.ts):'')+'</div></div></li>').join('')
@@ -100,7 +134,7 @@ async function load(){
   }
 }
 load();
-setInterval(load, 180000);
+setInterval(load, 60000);
 </script>
 </body>
 </html>
