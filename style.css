@@ -55,3 +55,35 @@ th{background:#141924;color:#c3ccdd}
 .nav a{color:#8b96ad}
 .nav a:hover{color:#5b9dff}
 @media(max-width:560px){h1{font-size:21px}.gauge-top{flex-direction:column;align-items:flex-start}}
+
+/* ---- 단순화된 첫 화면 (모바일 우선) ---- */
+.status .row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.status .lvl{font-size:38px;font-weight:700;letter-spacing:-1.5px;line-height:1.05}
+.status .lvl small{display:block;font-size:14px;font-weight:500;color:#8b96ad;letter-spacing:0;margin-top:4px}
+.status .when{color:#8b96ad;font-size:12px;text-align:right;white-space:nowrap}
+.status .what{margin:14px 0 0;padding:12px 14px;background:#0d111a;border-radius:10px;
+  font-size:15px;color:#dbe3f0;border-left:3px solid #5b9dff}
+
+.tl li>div{flex:1;min-width:0}
+.tl a{font-size:15px;line-height:1.5;display:block}
+.tl a:hover,.fd a:hover{color:#5b9dff}
+.tl .m,.fd .m{color:#8b96ad;font-size:12px;margin-top:4px}
+.tl .empty,.fd .empty{color:#8b96ad;font-size:14px;padding:8px 0}
+
+.fd{list-style:none}
+.fd li{border-bottom:1px solid #242b3a;padding:12px 0}
+.fd li:last-child{border:0}
+.fd a{font-size:15px;line-height:1.5;display:block}
+
+.act p{font-size:15px;color:#dbe3f0;margin:2px 0 14px}
+.btn{display:inline-block;background:#5b9dff;color:#08111f;font-weight:600;font-size:15px;
+  padding:12px 18px;border-radius:10px}
+.btn:hover{background:#7db1ff}
+
+.card.small{background:#0d111a}
+.card.small p{font-size:14px;color:#a9b4c8;margin:0 0 8px}
+.card.small .dim{font-size:13px;margin:0}
+.dim{color:#8b96ad}
+
+h2{font-size:16px;color:#c3ccdd}
+h2 small{font-size:12px;color:#8b96ad;font-weight:400;margin-left:6px}
