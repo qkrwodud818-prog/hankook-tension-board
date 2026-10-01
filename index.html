@@ -45,16 +45,10 @@
 <h2>오늘 나온 안보 뉴스 <small id="cnt"></small></h2>
 <div class="card"><ul class="fd" id="fd"></ul></div>
 
-<h2>평소 준비해 두면 좋은 것</h2>
+<h2>평소 준비해 두면 좋은 것 <small>좌우로 스크롤</small></h2>
 <div class="card aff">
-  <p class="disc">긴장 국면이 아니라 <b>평상시</b>에 사 두면 됩니다. 긴장이 올라왔을 때 급하게 사지 않아도 됩니다.<br>
-  아래 링크는 <b>쿠팡 파트너스 제휴 링크</b>로, 구매하시면 이 사이트에 수수료가 지급될 수 있습니다. <b>가격 차이는 없으며 사지 않으셔도 됩니다.</b></p>
-  <ul class="pl">
-    <li><a href="#CP-WATER">생수 · 1인 3일치</a><span>가장 먼저 떨어집니다</span></li>
-    <li><a href="#CP-BATTERY">수동 충전 보조배터리</a><span>정전 시 콘센트도 사라집니다</span></li>
-    <li><a href="#CP-RADIO">휴대폰 FM 라디오</a><span>지자체 방송 주파수 수신</span></li>
-    <li><a href="#CP-FOOD">비상식 3일분</a><span>가스레인지 사용 가능 제품</span></li>
-  </ul>
+  <p class="disc">아래 상품은 <b>쿠팡 파트너스 제휴 링크</b>입니다. 구매하시면 이 사이트에 수수료가 지급될 수 있으며, <b>구매 가격에는 차이가 없습니다. 필요 없으면 사지 않으셔도 됩니다.</b></p>
+<div id="deals" class="deals"><p class="empty">불러오는 중…</p></div>
   <p class="dim"><a href="/guides">전체 준비물 체크리스트 보기</a></p>
 </div>
 
@@ -135,6 +129,7 @@ async function load(){
 }
 load();
 setInterval(load, 60000);
+renderDeals('deals');
 </script>
 </body>
 </html>

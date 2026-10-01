@@ -42,3 +42,33 @@ if (document.readyState === "loading") {
 } else {
   mountAds();
 }
+
+/* ── 쿠팡 파트너스 제휴 상품 카드 (가로 스크롤) ───────────────── */
+function escHtml(s) {
+  return (s || "").replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+  });
+}
+
+function renderDeals(target) {
+  fetch("/api/deals", { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      var list = j.items || [];
+      var el = document.getElementById(target);
+      if (!el) return;
+      if (!list.length) { el.innerHTML = '<p class="empty">상품 정보를 불러오지 못했습니다.</p>'; return; }
+      el.innerHTML = list.map(function (d) {
+        return '<a class="pc" href="' + escHtml(d.link) + '" target="_blank" rel="nofollow noopener sponsored">' +
+          (d.image ? '<img src="' + escHtml(d.image) + '" alt="' + escHtml(d.title) + '" loading="lazy" ' +
+            'referrerpolicy="no-referrer" onerror="this.style.visibility=\'hidden\'">' : '<div class="ph"></div>') +
+          '<div class="pt">' + escHtml(d.title) + '</div>' +
+          (d.price ? '<div class="pp">' + escHtml(d.price) + '</div>' : '') +
+          '</a>';
+      }).join("");
+    })
+    .catch(function () {
+      var el = document.getElementById(target);
+      if (el) el.innerHTML = '<p class="empty">상품 정보를 불러오지 못했습니다.</p>';
+    });
+}

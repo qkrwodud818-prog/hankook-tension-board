@@ -522,6 +522,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/weekly":
             self._send(200, read_file("weekly.html"), "text/html; charset=utf-8")
             return
+        if path in ("/api/deals", "/deals.json"):
+            try:
+                self._send(200, read_file("deals.json"), "application/json; charset=utf-8")
+            except FileNotFoundError:
+                self._send(200, '{"items":[]}', "application/json; charset=utf-8")
+            return
         if path == "/ads.js":
             self._send(200, read_file("ads.js"), "application/javascript; charset=utf-8")
             return
