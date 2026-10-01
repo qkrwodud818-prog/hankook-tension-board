@@ -10,7 +10,10 @@
  *    - AdSense > 광고 > AdSense 광고유닛 에서 슬롯별 ID 를 만들어
  *      data-ad-slot 속성에 넣어두면 그 ID 가 사용됩니다.
  */
-const ADSENSE_CLIENT = "";          // ← publisher ID 입력
+// 계정 ID (Account ID): AF5644596
+// 아래에는 publisher ID 를 넣습니다. 형식: ca-pub-1234567890123456
+// (AdSense > 관리 > 계정 정보 > "광고 코드" 화면의 ca-pub- 줄에서 확인)
+const ADSENSE_CLIENT = "";
 const ADSENSE_ENABLED = ADSENSE_CLIENT.startsWith("ca-pub-");
 
 function mountAds() {
