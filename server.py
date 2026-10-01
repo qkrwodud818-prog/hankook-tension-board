@@ -17,7 +17,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 KST = timezone(timedelta(hours=9))
 CACHE_TTL = 300  # 5분
@@ -26,16 +26,35 @@ def gnews(query, days=7):
     q = urllib.parse.quote(f"{query} when:{days}d")
     return f"https://news.google.com/rss/search?q={q}&hl=ko&gl=KR&ceid=KR:ko"
 
-# (라벨, URL, 원본명 유지 여부)
+
+def bing(query):
+    """Bing 뉴스 RSS — 썸네일 이미지를 함께 제공한다(구글뉴스 RSS에는 없음)."""
+    q = urllib.parse.quote(query)
+    return f"https://www.bing.com/news/search?q={q}&format=RSS&setmkt=ko-KR"
+
+
+# (라벨, URL, 종류) 종류: gnews=구글뉴스 / bing=썸네일 有 / plain=일반RSS
 FEEDS = [
-    ("구글뉴스 · 북한안보", gnews("북한 안보"), False),
-    ("구글뉴스 · 미사일", gnews("북한 미사일"), False),
-    ("구글뉴스 · 접경포격", gnews("접경지 북한"), False),
-    ("구글뉴스 · 병력", gnews("북한 병력 군부대"), False),
-    ("구글뉴스 · 대화", gnews("대북 대화"), False),
-    ("구글뉴스 · 한미일", gnews("한미일 군사훈련"), False),
-    ("연합뉴스 속보", "https://www.yna.co.kr/rss/news.xml", True),
+    ("구글뉴스 · 북한안보", gnews("북한 안보"), "gnews"),
+    ("구글뉴스 · 미사일", gnews("북한 미사일"), "gnews"),
+    ("구글뉴스 · 접경포격", gnews("접경지 북한"), "gnews"),
+    ("구글뉴스 · 병력", gnews("북한 병력 군부대"), "gnews"),
+    ("구글뉴스 · 대화", gnews("대북 대화"), "gnews"),
+    ("구글뉴스 · 한미일", gnews("한미일 군사훈련"), "gnews"),
+    ("bing · 북한안보", bing("북한 안보"), "bing"),
+    ("bing · 미사일", bing("북한 미사일"), "bing"),
+    ("bing · 접경지", bing("접경지 북한"), "bing"),
+    ("bing · 대화", bing("대북 대화"), "bing"),
+    ("연합뉴스 속보", "https://www.yna.co.kr/rss/news.xml", "plain"),
 ]
+
+
+def _tag(item, name):
+    """네임스페이스 무관하게 子요소 텍스트를 꺼낸다 (Bing RSS 는 네임스페이스가 붙는다)."""
+    for c in item:
+        if c.tag.split("}")[-1] == name:
+            return (c.text or "").strip()
+    return ""
 
 # 운동·연예 등 오탐 방지 제외어
 NOISE = re.compile(
@@ -44,22 +63,39 @@ NOISE = re.compile(
     r"|경찰|체포|살인|방화|횡령|도주|임금체불|부동산|프로필"
 )
 
-# 키워드 가중치 (긴장도 점수)
-WEIGHTS = [
-    (r"미사일|탄도미사일|대륙간|ICBM", 12),
-    (r"다발|동시\s*발사|연이어|연일", 8),
-    (r"경의선|접경지|접근\s*금지", 10),
-    (r"폭파|파괴|철거", 9),
-    (r"포병|포격|사격\s*준비|완전사격", 11),
-    (r"긴급안보|비상안보|국가안보회의|국방부\s*대응", 7),
-    (r"무인기|드론\s*침투|정찰", 7),
-    (r"병력|군부대|증원", 5),
-    (r"방사능|핵실험|핵탄두", 6),
-    (r"해제|평화|호위\s*중단|대화\s*중단", -6),
-    (r"협상|대화\s*재개|회의\s*개최|통일\s*논의", -7),
-    (r"긴장\s*완화|톤\s*완화|온화", -8),
+# 실제 사건 신호 — 헤드라인에 이 표현이 있으면 사건이 발생했다는 뜻
+ESCALATION = [
+    (r"미사일.{0,8}발사|발사.{0,8}미사일|미사일\s*사한", 12),
+    (r"접경지|경의선|접근\s*금지", 10),
+    (r"포격|포병|완전사격|실사격", 11),
+    (r"폭파|시설\s*파괴", 9),
+    (r"긴급안보|비상안보|국가안보회의|안보상황점검", 7),
+    (r"침투|정찰\s*비행", 6),
     (r"사망|부상|총상", 6),
+    (r"병력\s*증원|군부대\s*이동", 5),
 ]
+
+# 능력·전술·방산 논의 — 안보 문맥일 수 있으나 사건 발생을 뜻하지 않는다
+# (예: "현무 2000기로는 감당 못한다", "대북확성기 거론")
+CAPABILITY = [
+    (r"미사일|탄도미사일|대륙간|ICBM", 4),
+    (r"무인기|드론", 3),
+    (r"병력|군부대", 3),
+    (r"방산|전쟁\s*패권|군비\s*경쟁|확성기", 2),
+    (r"사격\s*준비|정찰", 3),
+]
+
+# 완화 신호 (음수 가중치)
+EASING = [
+    (r"긴장\s*완화|톤\s*완화|온화", -8),
+    (r"대북\s*대화|남북\s*대화|북미\s*대화|대화\s*재개|고위급\s*대화", -7),
+    (r"협상|교섭|통일\s*논의|회의\s*개최", -5),
+]
+
+#、역량 논의에 자주 붙는 맥락어 — 이게 있으면 사건 신호가 아니라 분석 기사로 본다
+ANALYSIS_CTX = re.compile(
+    r"능력|_PAD|패권|경쟁|-race|우위|열세|격차|부족|추격|劣势한계|검토|필요|방어|대응\s*준비|역량"
+)
 
 # 이벤트 라벨: (패턴, 라벨, 이모지)
 EVENTS = [
@@ -111,7 +147,7 @@ def parse_date(s):
 
 def collect():
     items, errors = [], []
-    for name, url, keep_label in FEEDS:
+    for name, url, kind in FEEDS:
         try:
             raw = fetch(url)
             root = ET.fromstring(raw)
@@ -120,22 +156,35 @@ def collect():
                 title = html.unescape((it.findtext("title") or "").strip())
                 if not title:
                     continue
-                src = name
-                if not keep_label:
+                src, link, image = name, (it.findtext("link") or "").strip(), ""
+
+                if kind == "gnews":
                     src_el = it.find("source")
                     src = (src_el.text or "").strip() if src_el is not None and src_el.text else name
                     # 구글뉴스 제목 끝의 " - 매체명" 제거
                     title = re.sub(r"\s+-\s+[^-]{2,30}$", "", title)
+
+                elif kind == "bing":
+                    src = _tag(it, "Source").split(" on ")[0] or name
+                    image = _tag(it, "Image")
+                    # apiclick 리다이렉트 대신 실제 기사 URL 을 꺼낸다
+                    qs = parse_qs(urlparse(link).query)
+                    if qs.get("url"):
+                        link = qs["url"][0]
+
                 if NOISE.search(title):
                     continue
-                link = (it.findtext("link") or "").strip()
                 pub = parse_date(it.findtext("pubDate"))
                 desc = html.unescape(re.sub(r"<[^>]+>", " ", it.findtext("description") or ""))
+                if not image:
+                    m = re.findall(r'<img[^>]+src="([^"]+)"', desc)
+                    image = m[0] if m else ""
                 items.append(
                     {
                         "source": src,
                         "title": title,
                         "link": link,
+                        "image": image or None,
                         "published": pub.isoformat() if pub else None,
                         "ts": pub.timestamp() if pub else 0,
                         "summary": re.sub(r"\s+", " ", desc).strip()[:220],
@@ -160,16 +209,25 @@ def collect():
     recent = [i for i in items if i["ts"] and now - i["ts"] < 60 * 60 * 24 * 7]
 
     # 긴장도: 최근 48시간 헤드라인 가중합 → 0~100 정규화
+    # 같은 사건을多家가 보도하면 그만큼 반복되므로 "고유 사건 수" 기준으로 스케일을 나눈다.
     score = 0
     for i in recent:
         if now - i["ts"] > 48 * 3600:
             continue
         text = i["title"] + " " + i["summary"]
         decay = 1.0 - min(1.0, (now - i["ts"]) / (48 * 3600)) * 0.5
-        for pat, w in WEIGHTS:
+        analysis = bool(ANALYSIS_CTX.search(i["title"]))
+        for pat, w in ESCALATION:
+            if re.search(pat, text):
+                score += (w * 0.45 if analysis else w) * decay
+        if not analysis:
+            for pat, w in CAPABILITY:
+                if re.search(pat, text):
+                    score += w * decay
+        for pat, w in EASING:
             if re.search(pat, text):
                 score += w * decay
-    level = max(0, min(100, int(round(100 * (1 - math.exp(-max(score, 0) / 55))))))
+    level = max(0, min(100, int(round(100 * (1 - math.exp(-max(score, 0) / 75))))))
 
     by_source = {}
     for i in items:
@@ -177,17 +235,24 @@ def collect():
             continue
         by_source.setdefault(i["source"], []).append(i)
 
-    # 소스별 공정 배분 (한 매체가 화면을 독점하지 않도록)
-    interleaved, round_no = [], 0
+    # 1) 이미지가 있는 기사를 먼저 (최대 18개) — 스크롤 없이 썸네일이 보이도록
+    interleaved = [i for i in items if i["ts"] and now - i["ts"] <= 7 * 86400 and i.get("image")][:18]
+    taken = {id(x) for x in interleaved}
+
+    # 2) 나머지는 소스별 공정 배분으로 채운다 (한 매체가 화면을 독점하지 않도록)
+    round_no = 0
     while len(interleaved) < 60:
         added = False
         for src in by_source:
             lst = by_source[src]
-            if round_no < len(lst):
-                interleaved.append(lst[round_no])
-                added = True
-                if len(interleaved) >= 60:
+            for k in range(round_no, len(lst)):
+                if id(lst[k]) not in taken:
+                    taken.add(id(lst[k]))
+                    interleaved.append(lst[k])
+                    added = True
                     break
+            if added and len(interleaved) >= 60:
+                break
         if not added:
             break
         round_no += 1
@@ -339,6 +404,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/weekly":
             self._send(200, read_file("weekly.html"), "text/html; charset=utf-8")
+            return
+        if path == "/ads.js":
+            self._send(200, read_file("ads.js"), "application/javascript; charset=utf-8")
+            return
+        if path == "/ads.txt":
+            self._send(200, read_file("ads.txt"), "text/plain; charset=utf-8")
             return
         if path == "/robots.txt":
             self._send(200, read_file("robots.txt"), "text/plain; charset=utf-8")

@@ -1,0 +1,2 @@
+# ads.txt — Google AdSense 승인 후 콘솔에 표시되는 publisher ID 로 교체하세요.
+# 예: google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0

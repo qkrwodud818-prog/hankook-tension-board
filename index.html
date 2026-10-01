@@ -29,7 +29,7 @@
 <h2>무슨 일이 있었나</h2>
 <div class="card"><ul class="tl" id="tl"><li class="empty">확인 중…</li></ul></div>
 
-<div class="ads">[ 광고 영역 ]</div>
+<div class="ads" data-ad-slot="1234567890"></div>
 
 <h2>지금 준비할 것</h2>
 <div class="card act">
@@ -50,6 +50,7 @@
   <a href="/about">소개</a> · <a href="/contact">문의</a> · <a href="/privacy">개인정보처리방침</a> · <a href="/terms">이용약관</a>
 </footer>
 
+<script src="/ads.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const COL = {'관측':'#3ddc97','주의':'#ffc857','경계':'#ff8b5e','위기':'#ff5470','오류':'#8b96ad'};
@@ -61,6 +62,10 @@ const ACT = {
   '위기': '공식 대체 방송과 자치단체 알림만 기준하세요. 지자체 앱을 확인하세요.'
 };
 const esc = s => (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// 썸네일 (없으면 아무것도 렌더하지 않음)
+const thumb = i => i.image
+  ? '<img class="thumb" src="'+esc(i.image)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
+  : '';
 function ago(ts){
   const d = Date.now()/1000 - ts;
   if(d<3600) return Math.max(1,Math.round(d/60))+'분 전';
@@ -80,14 +85,14 @@ async function load(){
     $('act').textContent = ACT[j.state] || '';
 
     $('tl').innerHTML = (j.timeline||[]).length ? j.timeline.slice(0,8).map(t=>
-      '<li><span class="e">'+t.emoji+'</span><div><a href="'+esc(t.link)+'" target="_blank" rel="noopener">'+esc(t.title)+'</a>'+
+      '<li>'+thumb(t)+'<span class="e">'+t.emoji+'</span><div><a href="'+esc(t.link)+'" target="_blank" rel="noopener">'+esc(t.title)+'</a>'+
       '<div class="m">'+esc(t.label)+' · '+(t.ts?ago(t.ts):'')+'</div></div></li>').join('')
       : '<li class="empty">최근 며칠 분류된 안보 이벤트가 없습니다.</li>';
 
     $('cnt').textContent = j.feed ? j.feed.length + '건' : '';
     $('fd').innerHTML = (j.feed||[]).slice(0,25).map(i=>
-      '<li><a href="'+esc(i.link)+'" target="_blank" rel="noopener">'+esc(i.title)+'</a>'+
-      '<div class="m">'+esc(i.source)+' · '+(i.ts?ago(i.ts):'')+'</div></li>').join('')
+      '<li>'+thumb(i)+'<div><a href="'+esc(i.link)+'" target="_blank" rel="noopener">'+esc(i.title)+'</a>'+
+      '<div class="m">'+esc(i.source)+' · '+(i.ts?ago(i.ts):'')+'</div></div></li>').join('')
       || '<li class="empty">불러오지 못했습니다.</li>';
   }catch(e){
     $('state').textContent='오류';
